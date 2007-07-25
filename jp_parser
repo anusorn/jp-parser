@@ -1,0 +1,673 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+use jp_vsys;
+use jp_vrouter;
+use jp_commands;
+use Getopt::Long;
+use SVG;
+
+#Diverse Variablen
+my %opt; #Optionen
+my $version = "0.4";
+my %config; #Inhalt der config-Datei
+my $filename; #Datei, die geparst werden soll
+my $outfile; #Ausgabe
+my $ext; #Endung(und damit auch Format)
+$main::name="(?:name )?(\"(?:[a-zA-Z0-9!./ _-]+)\"|(?:[a-zA-Z0-9!./_-]+))";  #Matcht auf die Namen in der Juniper-Config
+
+
+my %services = ();
+my $domain = "";
+my $host = "";
+my $notparsed = "";
+
+my @input;
+my $laenge;
+
+my $rootvsys = jp_vsys->new("Root") ;
+my $currentvsys = $rootvsys;
+
+#Gibt die Hilfe aus sowie, gegebenfalls einen übergebenen String mit Fehlermeldung
+sub usage_help {
+	my $message = shift;
+	print STDOUT << "EOF";
+
+Benutzung:
+$0 [-hvsl] [--version] [-t type ][-o filename] [-c filename] Datei
+
+h, help         : Diese Nachricht
+v, verbose      : Verbose Output
+o, output       : Ausgabe nach Filename
+c, config       : Liest Konfiguration von Filename
+s, silent       : Silent(lÃ¶scht verbose)
+l, legend		: Legende unterdrücken
+t, type         : Ausgabeformat(Default: svg)(Möglich: SVG, DOT)
+version	        : Version
+n, noemptyzones : Keine leeren Zonen anzeigen
+
+Beispiel: 
+$0 -v Datei
+$0 --version
+$0 -h
+
+EOF
+	print "$message\n\n" if defined($message);
+	exit;
+}
+
+#Parst die Konfiguration für die Grafiken, also die Farben
+sub parse_cfg
+{
+my $filename = shift;
+my $file; 
+if ($filename) {
+ 		$file = $filename;
+	} else {
+		my $basename = $0;
+		$basename =~ s/\.pl$//;
+		$file = "$basename.conf";
+	}
+ 
+#Default-Farben:
+my %config =(	color_root=>"lightgray",
+				color_vsys=>"red",
+				color_vrouter=>"green",
+				color_vrouter_sharable=>"blue",
+				color_zone=>"gray",
+				color_zone_sharable=>"white",
+				color_interface=>"orange",
+				color_route=>"white",
+				color_background=>"white") ;
+				
+open(FILE,'<'.$file) or return %config;				
+				
+while( <FILE> ) 
+  {
+  	next if /^\s*#/;
+  	next if /^(\s)*$/;
+  	last if /^__END__/;
+
+  	my ($key,$value) = split(/=/,$_,2);
+
+  	$key   =~ s/^\s+//;
+  	$key   =~ s/\s+$//;
+  	$value =~ s/^\s+//;
+  	$value =~ s/\s+$//;
+
+  	$config{$key} = $value;
+  }
+  
+ close(FILE);
+ return %config;
+}
+
+#Gibt die Version aus
+sub version{
+	print STDOUT << "EOF";
+$0 Version $version
+
+written by: Till Potinius
+			justamail\@justmoments.de
+
+EOF
+	exit;
+}
+
+#Parst die übergebenen Optionen
+sub parse_opt{
+
+my $opt = shift;
+
+Getopt::Long::Configure("bundling");
+GetOptions( $opt, "v|verbose+","h|help+","o|output:s","t|type:s","c|config:s","s|silent+","version+","n|noemptyzones+","l|legend+") or usage();
+
+%config = parse_cfg($opt{c});
+
+$opt{v} = 0 if $opt{s};
+$opt{t} = "svg" if !$opt{t};
+$ext = $opt{t};
+
+usage_help("Falsches Ausgabeformat: $opt{t}") if $opt{t} !~ /(svg|dot)/i;
+
+my $pattern = "\\.$opt{t}\$";
+$opt{o} =~ s/$pattern// if $opt{o};
+
+$filename = pop @ARGV or usage_help("Keine Datei angegeben");
+$outfile = $opt{o} ? "$opt{o}" : "$filename";
+
+usage_help() if $opt{h};
+print "Output: $outfile.$ext\n" if $opt{v};
+print "Verbose Mode\n" if $opt{v};
+print "Use File: $opt{c}\n" if $opt{c} && !($opt{s});
+
+version if $opt{v};
+}
+
+#Liest die zu parsende Datei ein
+sub readfile{
+	$filename = pop or usage_help("Keine Datei angegeben");
+	usage_help("Datei $filename kann nicht geÃ¶ffnet werden") if ((! -r "$filename") || (! -f "$filename"));
+	open (IN, "<$filename") or die "Kann Datei $filename nicht zum lesen Ã¶ffnen!";
+
+	my @input = <IN>;
+	close(IN);
+
+	return @input;
+	
+}
+
+#Gibt das Routing auf STDOUT aus.
+sub print_routing {
+	print STDOUT << "EOF";
+------------------------------------------------------------------------
+Begin Config
+Domain:  $domain
+Host:    $host 
+------------------------------------
+Services:
+EOF
+
+
+	
+foreach my $name (sort(keys(%services))) {
+		print "$name: $services{$name}\n";
+};
+$rootvsys->print();		
+}
+
+#Erzeugt die Legende
+sub generate_svg_legend {
+	my $svg = shift;
+
+	my $legend = $svg->group(id=>"legend");
+
+	my $xcoord = $rootvsys->getwidth(\%opt) + 20;
+	my $ycoord = 30;
+	
+	my $coord;
+	
+	my $color =  $config{color_route};
+
+	$legend->rect(x=>"$xcoord",y=>"$ycoord", width=>"190", height=>"150", fill=>"$color", stroke=>"black");
+	
+	$legend->rect(x=>$xcoord+15,y=>"36", width=>"15", height=>"15", fill=>"$config{color_root}", stroke=>"black");
+	$legend->rect(x=>$xcoord+15,y=>"54", width=>"15", height=>"15", fill=>"$config{color_vsys}", stroke=>"black");
+	$legend->rect(x=>$xcoord+15,y=>"72", width=>"15", height=>"15", fill=>"$config{color_vrouter}", stroke=>"black");
+	$legend->rect(x=>$xcoord+15,y=>"90", width=>"15", height=>"15", fill=>"$config{color_vrouter_sharable}", stroke=>"black");
+	$legend->rect(x=>$xcoord+15,y=>"108", width=>"15", height=>"15", fill=>"$config{color_zone}", stroke=>"black");
+	$legend->rect(x=>$xcoord+15,y=>"126", width=>"15", height=>"15", fill=>"$config{color_zone_sharable}", stroke=>"black");
+	$legend->rect(x=>$xcoord+15,y=>"144", width=>"15", height=>"15", fill=>"$config{color_interface}", stroke=>"black");
+	
+	$legend->text(x=>$xcoord+40, y=>"50", "font-size"=>12, font=>"Verdana", -cdata=>"Root-VSys");
+	$legend->text(x=>$xcoord+40, y=>"68", "font-size"=>12, font=>"Verdana", -cdata=>"VSys");
+	$legend->text(x=>$xcoord+40, y=>"86", "font-size"=>12, font=>"Verdana", -cdata=>"VRouter");
+	$legend->text(x=>$xcoord+40, y=>"104", "font-size"=>12, font=>"Verdana", -cdata=>"VRouter(sharable)");
+	$legend->text(x=>$xcoord+40, y=>"122", "font-size"=>12, font=>"Verdana", -cdata=>"Zone");
+	$legend->text(x=>$xcoord+40, y=>"140", "font-size"=>12, font=>"Verdana", -cdata=>"Zone(shared)");
+	$legend->text(x=>$xcoord+40, y=>"158", "font-size"=>12, font=>"Verdana", -cdata=>"Interface");
+
+
+}
+
+#Zeichnet die Routen zwischen VRouter und Zonen.
+sub generate_svg_route{
+	my ($routes, $svg) = @_; 
+	my ($rightx, $righty, $topx, $topy);
+	my $lastline = "empty";
+	my $newline = "";
+	my $virtualroute;
+	my $routing = $svg->group(id=>"Routing");
+	foreach $virtualroute (@{$routes}) {
+		my ($x1, $y1) = $$virtualroute[0]->getcoord();
+		my ($x2, $y2) = $$virtualroute[1]->getcoord(); 
+		if ($x1 > $x2) {
+			($$virtualroute[0], $$virtualroute[1]) = ($$virtualroute[1], $$virtualroute[0]);
+		}
+
+		($topx, $topy) = $$virtualroute[0]->getdowncoord();
+		($rightx, $righty) = $$virtualroute[1]->getleftcoord();
+		
+		my ($tmpx, $tmpy) = ($topx, $righty);
+
+		my $xv = [$topx, $tmpx, $rightx];
+    	my $yv = [$topy, $tmpy, $righty];
+		
+		my $points = $routing->get_path(x=>$xv, y=>$yv, -type=>'polyline',-closed=>'false');
+		
+		$routing->polyline(%$points, fill=>"none", stroke=>"black", "stroke-width"=>"2" );
+
+	}
+}
+
+#Zeichnet die Routen zwischen VRouter und Zonen.
+sub generate_dot_route{
+	my ($DOT, $routes) = @_; 
+	my $newline;
+	my $lastline="";
+
+	foreach my $virtualroute (@{$routes}) {
+		my $x1 = $$virtualroute[0]->getname();
+		my $x2 = $$virtualroute[1]->getname(); 
+		if ($x1 gt $x2) {
+			($$virtualroute[0], $$virtualroute[1]) = ($$virtualroute[1], $$virtualroute[0]);
+		}
+	
+     	$newline = $$virtualroute[0]->getdot_target_name()."--".$$virtualroute[1]->getdot_target_name()." [weight=".$$virtualroute[0]->getdotweight()*$$virtualroute[1]->getdotweight()."];\n";
+	 	print $DOT $newline if $newline ne $lastline;
+	 	$lastline = $newline;	
+	}
+}
+
+
+#Erzeugt die svg-Ausgabe
+sub generate_svg{
+	my $height = 30 + $rootvsys->getheight(\%opt);
+	my $width = 20 + $rootvsys->getwidth(\%opt);
+
+	$width += 200 if !$opt{l};
+
+	my $routes = [];
+	my $xpos=10;
+	my $ypos=30;
+
+	my $svg =SVG->new(width=>"$width", height=>"$height");
+
+	$svg->title(id=>'document-title')->cdata("$host");
+	$svg->text(x=>10, y=>20, -cdata=>"$host", font=>"Verdana");
+
+	$rootvsys->generate_svg($svg, $xpos, $ypos, $routes, \%opt, \%config);
+
+	generate_svg_route($routes, $svg);
+	generate_svg_legend($svg) if !$opt{l};
+
+	open(OUTSVG,'>'.$outfile.".svg") or die "Kann Ausgabe $outfile.svg nicht schreiben";
+
+	print OUTSVG $svg->xmlify;
+
+	close(OUTSVG);
+}
+
+#Erzeugt die Ausgabe als dot-Datei
+sub generate_dot{
+	
+	my $routes = [];
+	open(OUTDOT,'>'.$outfile.".dot") or die "Kann Ausgabe $outfile.dot nicht schreiben";
+
+	$rootvsys->generate_dot(*OUTDOT, $routes, \%opt, \%config);
+	
+	generate_dot_route(*OUTDOT, $routes);
+
+	print OUTDOT "}\n";
+
+	close(OUTDOT);
+}
+
+#Liest die Config und ruft entsprechend die Funktionen der jp_commands auf.
+sub parse_file{
+	#Variablen fÃ¼r Schleife:
+my $vsys_name;
+my $vsys_param;
+my $un;
+my $vrouter_name;
+my $vrouter_param;
+my $inner_line;
+my $service_name;
+my $service_value;
+my $if_name;
+my $if_param;
+my $zone_name;
+my $command;
+my $id;
+my $vrouter_id;
+
+
+
+for ( my $i = 0 ; $i < @input ; $i++) {
+	
+	my $line = $input[$i];
+	next if $line =~ /^#.*/;
+	
+	# Resourcen-Verteilung fÃ¼r die Vsys:
+	if ( $line =~ /^set vsys-profile $main::name (.*)/ ) {
+		$vsys_name = $1;
+		$vsys_param = $2;
+		$vsys_name =~ s/"//g;
+		if ($vsys_name eq $rootvsys->getname()) {
+			jp_commands::vsys_profile($vsys_param, $rootvsys);
+		} else {
+			jp_commands::vsys_profile($vsys_param, $rootvsys->getvsysbyname($vsys_name));
+		}
+		next;	
+	}
+	
+	# V-Router konfigurieren:
+	# KEINE BLOCKSTATEMENTS, die kommen spÃ¤ter!
+	if ( $line =~ /^(un|)set vrouter $main::name (.*)/ ) {
+		$un = $1;
+		$vrouter_name = $2;
+		$vrouter_param = $3;
+		$vrouter_name =~ s/"//g;
+		if ($vrouter_param =~ /default-vrouter/) {
+			jp_commands::vrouter($vrouter_name, "create", ($un eq "un"), $rootvsys, $currentvsys);
+			jp_commands::vsys_default_vr($vrouter_name, $currentvsys, $rootvsys);
+		} else {
+			jp_commands::vrouter($vrouter_name, $vrouter_param, ($un eq "un"), $rootvsys, $currentvsys);
+		}
+		next;
+	}
+
+	# VRouter-Block:
+	if ( $line =~ /^set vrouter $main::name/ ) {
+		my $vrouter_name = $1;
+		$vrouter_name =~ s/"//g;
+		#Falls leerer Block, vrouter wird immer angelegt:
+		jp_commands::vrouter($vrouter_name, "nothing", 0, $rootvsys, $currentvsys);
+		$inner_line = $input[++$i];
+		while ( $inner_line !~ /exit/) {
+			if ($inner_line =~ /^(un|)set (.*)$/ ) {
+				jp_commands::vrouter($vrouter_name, $2, ($1 eq "un"), $rootvsys, $currentvsys);
+			}
+		} continue {
+			$inner_line = $input[++$i];
+			last if ($i == $laenge);
+		}
+		last if ($i == $laenge);
+		next;
+	}
+	
+	# Services:
+	if ($line =~ /^set service $main::name (.*)$/ ) {
+		$service_name = $1;
+		$service_value = $2;
+		$service_name =~ s/"//g;
+		$services{$service_name} = $service_value;
+		next;
+	}
+
+	# set interface mit id
+	if ($line =~ /^(un|)set interface(?: id [0-9]+)? $main::name (.*)/) {
+		$un = $1;
+		$if_name = $2;
+		$if_param = $3;
+		$if_name =~ s/"//g;
+		jp_commands::interface($if_name, $if_param, ($un eq "un"),  $currentvsys);
+		next;
+	}
+
+	# zone
+	if ($line =~ /^(un|)set zone (.*)/  ) {
+		jp_commands::zone($2, ( $1 eq "un" ), $rootvsys, $currentvsys);
+		next;
+	}
+
+	# set address
+	if ( $line =~ /^(un|)set address $main::name (.*)$/ )  {
+		$un = $1;
+		$zone_name = $2;
+		$command = $3;
+		$zone_name =~ s/"//g;
+		jp_commands::address($zone_name, $command, ($un eq "un"), $currentvsys);
+		next;
+
+	}
+		
+	# set group address
+	# Nimmt nur den Gruppennamen auf:
+	if ($line =~ /^(un|)set group address $main::name $main::name( [^a]+.*)?/ ) {
+		$un = $1;
+		$zone_name = $2;
+		$command = $4 ? "$3$4" : $3;	
+		$command =~ s/"//g;
+		$zone_name =~ s/"//g;
+		jp_commands::group($zone_name, $command, ($un eq "un"), $currentvsys);
+		next;
+	}
+
+	#Zone ignoriert, laut Doku muss hinter vrouter noch ein "name name_str", daher auch ignoriert
+	#Hinter dem Namen sind seltsamerweise 2 Leerzeichen. 
+	if ($line =~ /^(un|)set vsys $main::name  ?zone [0-9]+ vrouter id ([0-9]+)/ ) {
+		$vsys_name = $2;
+		$id = $3;
+		$vsys_name =~ s/"//g;
+		$currentvsys = $rootvsys->getvsysbyname($vsys_name);
+		print "now entering: $vsys_name\n" if $opt{v};
+		if ($rootvsys->getname() ne $currentvsys->getname()) {
+			$currentvsys->unset("root");
+		}
+		next;
+	}
+
+	if ($line =~ /^(un|)set vsys $main::name  ?zone [0-9]+ vrouter $main::name id ([0-9]+)/ ) {
+		$vsys_name = $2;
+		$vrouter_name = $3;
+		$vrouter_id = $4;
+		$un = $1;
+		$vsys_name =~ s/"//g;
+		$vrouter_name =~ s/"//g;
+		$currentvsys = $rootvsys->getvsysbyname($vsys_name);
+		print "now entering: $vsys_name\n" if $opt{v};
+		if ($rootvsys->getname() ne $currentvsys->getname()) {
+			$currentvsys->unset("root");
+		}
+		jp_commands::vrouter($vrouter_name, "id $vrouter_id", $un, $rootvsys, $currentvsys);
+		jp_commands::vsys_default_vr($vrouter_name, $currentvsys, $rootvsys);
+		next;
+	}
+
+	if ($line =~ /^set vsys-id ([0-9]+)/ ) {
+		$id = $1;
+		jp_commands::vsys_id($currentvsys, $id);
+		next;
+	}
+
+	if ( $line =~ /^exit$/ ) {
+		$currentvsys = $rootvsys;
+		$vsys_name = $currentvsys->getname();
+		print "now entering: $vsys_name\n" if $opt{v};
+		next;	
+	}
+
+	# set domain
+	if ($line =~ /^set domain $main::name/ ) {
+		$domain = $1;
+		$domain =~ s/"//g;
+		next;
+	}
+
+	# set hostname
+	if ($line =~ /^set hostname $main::name/ ) {
+		$host = $1;
+		$host =~ s/"//g;
+		next;
+	}
+
+	#Nicht verarbeitete Befehle:
+	if (
+		$line =~ /^set auth-server $main::name (.*)$/ ||
+		$line =~ /^set hardware .*/ ||
+		$line =~ /^set clock .*/ ||
+		$line =~ /^set auth .*/ ||
+		$line =~ /^set admin .*/ ||
+		$line =~ /^set interface id .*/ ||
+		$line =~ /^(un|)set flow .*/ ||
+		$line =~ /^(un|)set console ./ ||
+		$line =~ /^set pki .*/ ||
+		$line =~ /^set dns .*/ ||
+		$line =~ /^(un|)set ike .*/ ||
+		$line =~ /^(un|)set ipsec .*/ ||
+		$line =~ /^(un|)set arp .*/ ||
+		$line =~ /^(un|)set monitor .*/ ||
+		$line =~ /^(un|)set firewall .*/ ||
+		$line =~ /^(un|)set nsmgmt .*/ ||
+		$line =~ /^(un|)set ssh .*/ ||
+		$line =~ /^(un|)set config .*/ ||
+		$line =~ /^(un|)set ntp .*/ ||
+		$line =~ /^(un|)set snmp .*/ ||
+		$line =~ /^(un|)set preference .*/ ||
+		$line =~ /^(un|)set nsrp .*/ ||
+		$line =~ /^(un|)set log .*/ ||
+		$line =~ /^(un|)set scp .*/ ||
+		$line =~ /^(un|)set protocol .*/ ||
+		$line =~ /^(un|)set redistribute .*/ ||
+		$line =~ /^(un|)set syslog .*/ ||
+		# exit sollte nicht auftreten!
+		$line =~ /^exit/
+		) 
+	{
+		print "skipped: $i $line" if $opt{v};
+		next;
+	}
+	
+
+	#Nicht verarbeitet, erzeugt einen Block
+	if (
+		$line =~ /^(un|)set url .*/ ||
+	 	$line =~ /^(un|)set policy .*/
+	 	) 
+	 {
+		print "skipped: $i $line" if $opt{v};
+		$inner_line = $input[++$i];
+		while ( $inner_line !~ /^exit/) 
+		{} 
+		continue 
+		{	
+			$inner_line = $input[++$i];
+		}
+		next;
+	}
+	
+
+	
+	$notparsed = "NEXT TO PARSE: $i: $line ";
+	last;
+}
+}
+
+##################################
+### Hier fängt das Programm an:###
+##################################
+
+#Optionen auswerten:
+#Dabei wird auch die Config-Datei gelesen.
+parse_opt(\%opt);
+
+#Datei einlesen:
+@input = readfile($filename);
+$laenge = @input;
+
+#Datei verarbeiten:
+parse_file;
+
+#Die Interfaces zu den Zonen zuordnen:
+$rootvsys->parseinterfaces();
+
+#Routing auch auf STDOUT drucken, falls nicht die Option "Silent" gesetzt ist.
+print_routing if !$opt{s};
+
+
+generate_svg if $opt{t} =~ /svg/i;
+generate_dot if $opt{t} =~ /dot/i;
+
+
+=pod
+
+=head1 Name
+
+B<jp_parser> - Tool, um die Konfiguration von Juniper Networks Netscreen-Systemen grafisch darzustellen.
+
+=head1 SYNOPSIS
+
+=over 8
+
+=item B<jp_parser> [-hvsl] [-t type ][-o file] [-c file] file
+
+=item B<jp_parser> [--version]
+
+=back
+
+=head1 DESCRIPTION
+
+B<jp_parser> liest die Konfiguration eines Netscreen-Systems aus einer übergebenen Datei und erzeugt eine grafische Darstellung des darin 
+festgelegten Routings.
+
+Die Ausgabe kann im Scalable Vector Grafics-Format (SVG) oder in der dot-Markup-Language (DOT) erfolgen. Die SVG-Ausgabe
+lässt sich mit aktuellen Bildbetrachtern oder Browsern anzeigen, die DOT-Ausgabe kann mittels eines Renderers wie I<fdp> aus dem I<Graphviz>-Paket 
+in eine Bilddatei umgewandelt werden.  
+
+=head1 OPTIONS
+
+=over 8
+
+=item B<-h, --help> 
+
+Gibt die Hilfe aus
+
+=item B<-v, --verbose>
+
+Gibt viele Informationen aus. B<--silent> unterdrückt B<--verbose>.
+
+=item B<-c> F<file>, B<--config> F<file>
+
+Liest die Konfiguration für die Farbausgabe von F<file>. Siehe L<jp_parser.conf>
+
+=item B<-o> F<file>, B<--output> F<file>
+
+Benutzt F<file> für die Ausgabe.
+
+=item B<-s, --silent>
+
+Still. Keine Meldungen.
+
+=item B<-n, --noemptyzones>
+
+Unterdrückt die Ausgabe von Zonen, die keine Interfaces enthalten.
+
+=item B<-l, --legend>
+
+Unterdrückt die Ausgabe der Legende in der SVG-Ausgabe.
+
+=item B<-t> I<format>, B<--type> I<format>
+
+Legt das Ausgabeformat fest. Möglich sind Scalable Vector Grafics(SVG) und DOT-Markup-Language(DOT). Default ist SVG.
+
+=item B<--version> 
+
+Gibt die Version des Tools aus.
+
+=back
+
+=head1 EXAMPLES
+
+Ausgabe: Silent(I<s>), keine leeren Zonen(I<n>) als svg(I<-t svg>) nach output.svg(I<-o output.svg>).
+Farbdefinitionen stehen in jp_parser.conf(I<-c jp_parser.conf>) und das Tool soll die Datei netscreen.cfg verarbeiten:
+
+jp_parser -sn -t svg -o output.svg -c jp_parser.conf netscreen.cfg
+
+=head1 FILES
+
+B<jp_parser.conf> 
+
+=head1 SEE ALSO
+
+L<jp_parser.conf(5)>
+
+ Zur Weiterentwicklung:
+
+L<jp_interface.pm(3)>, L<jp_commands.pm(3)>, L<jp_zone.pm(3)>, L<jp_vsys.pm(3)>, L<jp_vrouter.pm(3)>
+
+=head1 REQUIRES
+
+Perl 5.8, Getopt::Long, SVG
+
+F<jp_interface.pm>, F<jp_commands.pm>, F<jp_zone.pm>, F<jp_vsys.pm>, F<jp_vrouter.pm>
+
+=head1 AUTHOR and COPYRIGHT
+
+     
+     Till Potinius
+     <justamail@justmoments.de>
+
+     Copyright (c) 2007 Till Potinius
+
+=cut
