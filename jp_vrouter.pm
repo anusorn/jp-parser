@@ -365,7 +365,7 @@ Refernz auf das SVG-Objekt, in dem der Router gezeichnet werden soll.
 
 =item B<$xpos> I<Integer>, B<$ypos> I<Integer>
 
-Die Koordinaten der linken oberen Ecke dedes Routers in der gesamten Grafik.
+Die Koordinaten der linken oberen Ecke des Routers in der gesamten Grafik.
 
 =item B<$routes> I<Array>
 
