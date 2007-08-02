@@ -331,6 +331,7 @@ for ( my $i = 0 ; $i < @input ; $i++) {
 	
 	my $line = $input[$i];
 	next if $line =~ /^#.*/;
+	next if $line =~ /^(\s)*$/;
 	
 	# Resourcen-Verteilung für die Vsys:
 	if ( $line =~ /^set vsys-profile $main::name (.*)/ ) {
