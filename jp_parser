@@ -132,6 +132,7 @@ $opt{t} = "svg" if !$opt{t};
 $ext = $opt{t};
 
 usage_help("Falsches Ausgabeformat: $opt{t}") if $opt{t} !~ /(svg|dot)/i;
+version if $opt{version};
 
 my $pattern = "\\.$opt{t}\$";
 $opt{o} =~ s/$pattern// if $opt{o};
@@ -144,7 +145,7 @@ print "Output: $outfile.$ext\n" if $opt{v};
 print "Verbose Mode\n" if $opt{v};
 print "Use File: $opt{c}\n" if $opt{c} && !($opt{s});
 
-version if $opt{v};
+
 }
 
 #Liest die zu parsende Datei ein
