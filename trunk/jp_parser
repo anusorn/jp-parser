@@ -131,6 +131,7 @@ GetOptions( $opt, "v|verbose+","h|help+","o|output:s","t|type:s","c|config:s","s
 
 $opt{v} = 0 if $opt{s};
 $opt{t} = "svg" if !$opt{t};
+$opt{t} = "dot" if $opt{o} =~ /\.dot$/i;
 $ext = $opt{t};
 
 usage_help("Falsches Ausgabeformat: $opt{t}") if $opt{t} !~ /(svg|dot)/i;

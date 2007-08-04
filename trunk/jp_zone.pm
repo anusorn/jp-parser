@@ -235,8 +235,7 @@ sub getwidth {
 	#Breite = 0, wenn Zone nicht gezeichnet werden soll.
 	return 0 if ($opt->{noempyzones} && $laenge == 0); 
 	
-	my $if_name;
-	foreach $if_name (keys(%{$self->{_interfaces}})) {
+	foreach my $if_name (keys(%{$self->{_interfaces}})) {
 		$subwidth = $$self{_interfaces}{$if_name}->getwidth($opt) if ($subwidth < $$self{_interfaces}{$if_name}->getwidth($opt));
 	}
 	$width += $subwidth;
