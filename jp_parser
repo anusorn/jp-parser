@@ -12,7 +12,7 @@ use SVG;
 
 #Diverse Variablen
 my %opt; #Optionen
-my $version = "0.4";
+my $version = "0.8";
 my %config; #Inhalt der config-Datei
 my $filename; #Datei, die geparst werden soll
 my $outfile; #Ausgabe
@@ -43,8 +43,8 @@ h, help         : Diese Nachricht
 v, verbose      : Verbose Output
 o, output       : Ausgabe nach Filename
 c, config       : Liest Konfiguration von Filename
-s, silent       : Silent(lÃ¶scht verbose)
-l, legend		: Legende unterdrücken
+s, silent       : Silent(löscht verbose)
+l, legend       : Legende unterdrücken
 t, type         : Ausgabeformat(Default: svg)(Möglich: SVG, DOT)
 version	        : Version
 n, noemptyzones : Keine leeren Zonen anzeigen
