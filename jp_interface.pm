@@ -80,11 +80,24 @@ sub set {
 #Für ein Zeichen wird eine Breite von ca. 8 Pixeln angenommen.
 sub getwidth {
         my $self = shift;
-        my $width = 30;
+        my $width = 20;
+        my $sublength = 0;
         my $groupname = $self->{_group} ? $self->{_group} : "";
         my $ipm = $self->{_ip_manageable} ? $self->{_ip_manageable} : "";
 		my $length = length($self->{_name}) > length($groupname) ? length($self->{_name}) : length($groupname);
 		$length = $length > length($ipm) ? $length : length($ipm);
+        
+        foreach my $ip (@{$self->{_ip}}) {
+			$sublength = length($ip) > $sublength ? length($ip) : $sublength;
+		}
+        $length = $length > $sublength ? $length : $sublength;
+        
+        foreach my $if (@{$self->{_sub_if}}) {
+			$sublength = length($if->getname()) > $sublength ? length($if->getname()) : $sublength;
+		}
+        
+        $length = $length > $sublength ? $length : $sublength;
+        
         $width += 8 * $length;
         return $width;
 }
