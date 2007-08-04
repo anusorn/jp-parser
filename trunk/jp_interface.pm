@@ -61,7 +61,9 @@ sub set {
 		$self->{_group} = $group;
 	# IP
 	} elsif ($param =~ /ip manageable/) {
-		$self->{_ip_manageable} = "manageable";
+		$self->{_ip_manageable} = " ";
+	} elsif ($param =~ /manage (.*)/) {
+		$self->{_ip_manageable} .= "$1 ";
 	} elsif ($param =~ /ip $main::name/) {
 		my $ip = $1;
 		$ip =~ s/"//g;
@@ -78,10 +80,9 @@ sub set {
 #Für ein Zeichen wird eine Breite von ca. 8 Pixeln angenommen.
 sub getwidth {
         my $self = shift;
-        my $width = 20;
+        my $width = 30;
         my $groupname = $self->{_group} ? $self->{_group} : "";
         my $ipm = $self->{_ip_manageable} ? $self->{_ip_manageable} : "";
-        
 		my $length = length($self->{_name}) > length($groupname) ? length($self->{_name}) : length($groupname);
 		$length = $length > length($ipm) ? $length : length($ipm);
         $width += 8 * $length;
@@ -108,6 +109,11 @@ sub generate_svg {
 			$yoffset += 16;
 		}
 		
+		if ($self->{_tag}) {
+			$svg_if->text(x=>$xpos+6, y=>$yoffset, -cdata=>"VLAN-Tag: $self->{_tag}", "font-size"=>12, font=>"Verdana");
+			$yoffset += 16;
+		}
+		
 		foreach my $if (@{$self->{_sub_if}}) {
 			my $if_name = $if->getname();
 			$svg_if->text(x=>$xpos+6, y=>$yoffset, -cdata=>"SubIf: $if_name", "font-size"=>12, font=>"Verdana");
@@ -120,7 +126,7 @@ sub generate_svg {
 		}
 		
 		if ($self->{_ip_manageable}) {
-			$svg_if->text(x=>$xpos+6, y=>$yoffset, -cdata=>"IP: $self->{_ip_manageable}", "font-size"=>12, font=>"Verdana");
+			$svg_if->text(x=>$xpos+6, y=>$yoffset, -cdata=>"Manage:$self->{_ip_manageable}", "font-size"=>12, font=>"Verdana");
 			$yoffset += 16;
 		}
 
@@ -131,10 +137,11 @@ sub get_dot_text{
 	my $self = shift;
 	my $opt = shift;
 	my $text = "";
+	$text .= "|VLAN-Tag: $self->{_tag}" if ($self->{_tag});
 	foreach my $ip (@{$self->{_ip}}) {
 		$text .= "|IP: $ip";
 	}
-	$text .= "|IP: manageable" if ($self->{_ip_manageable});
+	$text .= "|Manage: $self->{_ip_manageable}" if ($self->{_ip_manageable});
 	foreach my $if (@{$self->{_sub_if}}) {
 		$text .= "|IF: ".$if->getname();
 	}
@@ -146,6 +153,7 @@ sub getheight {
     my $height = 25;
 	$height += 16 if $self->{_group};
 	$height += 16 if $self->{_ip_manageable};   
+	$height += 16 if $self->{_tag}; 
 	my $sub_count = @{$self->{_ip}};
 	$sub_count += @{$self->{_sub_if}};
 	$height += 16 * $sub_count;
