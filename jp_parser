@@ -284,7 +284,7 @@ sub generate_svg{
 	my $xpos=10;
 	my $ypos=30;
 
-	my $svg =SVG->new(width=>"$width", height=>"$height");
+	my $svg =SVG->new(width=>"$width", height=>"$height", encoding=>"UTF-8");
 
 	$svg->title(id=>'document-title')->cdata("$host");
 	$svg->text(x=>10, y=>20, -cdata=>"$host", font=>"Verdana");
@@ -296,7 +296,7 @@ sub generate_svg{
 
 	open(OUTSVG,'>'.$outfile.".svg") or die "Kann Ausgabe $outfile.svg nicht schreiben";
 
-	print OUTSVG $svg->xmlify;
+	print OUTSVG $svg->xmlify(encoding=>"UTF-8");
 
 	close(OUTSVG);
 }
