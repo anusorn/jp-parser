@@ -1,5 +1,5 @@
 #summary Frequently Answered Questions
-#labels Phase-Support
+#labels documentation
 
 = Frequently Answered Questions =
 
@@ -12,5 +12,4 @@
   # ===Feature <somefeature> is missing===
     Maybe i can implement it, if i know about it.
     So tell me: <datenrecycling@gmail.com>
-
 
