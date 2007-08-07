@@ -1,5 +1,5 @@
 #summary Installation instructions for the tool
-#labels Phase-Deploy,Featured
+#labels documentation,Featured
 
 =Download=
 
@@ -44,6 +44,5 @@ To specifiy another path, run
 		
 To remove the tool, run
   `make clean`
-
 
 
