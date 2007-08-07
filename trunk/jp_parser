@@ -14,7 +14,7 @@ use SVG;
 
 #Diverse Variablen
 my %opt; #Optionen
-my $version = "0.8";
+my $version = "0.8.6";
 my %config; #Inhalt der config-Datei
 my $filename; #Datei, die geparst werden soll
 my $outfile; #Ausgabe

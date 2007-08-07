@@ -62,7 +62,7 @@ sub set {
 	# IP
 	} elsif ($param =~ /ip manageable/) {
 		$self->{_ip_manageable} = " ";
-	} elsif ($param =~ /manage (.*)/) {
+	} elsif ($param =~ /manage $main::name/) {
 		$self->{_ip_manageable} .= "$1 ";
 	} elsif ($param =~ /ip $main::name/) {
 		my $ip = $1;
@@ -191,7 +191,7 @@ sub print {
 	print "VLAN: $self->{_tag}\n" if (defined $self->{_tag});
 	print "Zone: $self->{_zone}\n" if (defined $self->{_zone});
 	print "Group: $self->{_group}\n" if (defined $self->{_group});
-	print "IP: $self->{_ip_manageable}\n" if (defined $self->{_ip_manageable});
+	print "Manage: $self->{_ip_manageable}\n" if (defined $self->{_ip_manageable});
 	map{print "IP: $_\n"}(@{$self->{_ip}});
 	map{print "SubInterface: ".$_->getname()."\n"}(@{$self->{_sub_if}});
 	print "Route: $self->{_route}\n" if (defined $self->{_route});
