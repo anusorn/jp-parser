@@ -6,11 +6,14 @@ use File::Spec;
 use FindBin;
 use Cwd;
 use lib "$FindBin::Bin";
+use lib "/home/till/juniper";
 use jp_vsys;
 use jp_vrouter;
 use jp_commands;
 use Getopt::Long;
 use SVG;
+
+binmode STDOUT, ':utf8';
 
 #Diverse Variablen
 my %opt; #Optionen
@@ -131,7 +134,7 @@ GetOptions( $opt, "v|verbose+","h|help+","o|output:s","t|type:s","c|config:s","s
 
 $opt{v} = 0 if $opt{s};
 $opt{t} = "svg" if !$opt{t};
-$opt{t} = "dot" if $opt{o} =~ /\.dot$/i;
+$opt{t} = "dot" if $opt{o} && $opt{o} =~ /\.dot$/i;
 $ext = $opt{t};
 
 usage_help("Falsches Ausgabeformat: $opt{t}") if $opt{t} !~ /(svg|dot)/i;
@@ -285,6 +288,8 @@ sub generate_svg{
 	my $ypos=30;
 
 	my $svg =SVG->new(width=>"$width", height=>"$height", encoding=>"UTF-8");
+	
+	$svg->rect(x=>0, y=>0, width=>"$width", height=>"$height", fill=>"white");	
 
 	$svg->title(id=>'document-title')->cdata("$host");
 	$svg->text(x=>10, y=>20, -cdata=>"$host", font=>"Verdana");
