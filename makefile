@@ -35,27 +35,27 @@ bin=/bin
 endif
 endif
 
-mandir1=${mandir}/man1/
-mandir3=${mandir}/man3/
-mandir5=${mandir}/man5/
+mandir1=${mandir}/man1
+mandir3=${mandir}/man3
+mandir5=${mandir}/man5
 
 currentdir=$(shell pwd)
 
 archivfiles = $(wildcard *.pm) jp_parser jp_parser.conf makefile LICENSE artistic.txt gpl-2.0.txt README
 archiv = jp_parser.tar.gz
-tar = /usr/bin/tar -z
+tar = /bin/tar -z
 
 
 help: exec
 	@echo "Aufruf:"
-	@echo "make install: Installiert Verknüpfung nach /usr/bin/jp_parser(oder ein anderes bin-Verzeichnis im $PATH) und installier die man-Pages"
+	@echo 'make install: Installiert VerknÃ¼pfung nach /usr/bin/jp_parser(oder ein anderes bin-Verzeichnis im $$PATH) und installiert die man-Pages'
 	@echo "make documentation: Erzeugt die man-Pages im Verzeichnis ./doc/"
 	@echo "make clean: Entfernt die erzeugten Dateien"
 
 
 
 mandirs:
-	@test -n ${mandir} || echo "Kann man-Verzeichnis(z.B. /usr/share/man) nicht finden. Manuelle Eingabe über 'make mandir=/path/to/manpages' [target]."
+	@test -n ${mandir} || echo "Kann man-Verzeichnis(z.B. /usr/share/man) nicht finden. Manuelle Eingabe Ã¼ber 'make mandir=/path/to/manpages' [target]."
 	@test -n ${mandir}
 	@test -w ${mandir} || "Kann nicht in ${mandir} schreiben. Root-Rechte?"
 	@test -w ${mandir}
@@ -64,9 +64,9 @@ mandirs:
 	@test -d ${mandir5} || mkdir ${mandir5}
 
 install: doc mandirs exec
-	@test -n ${bin} || echo "Kann bin-Verzeichnis(z.B. /usr/bin) nicht finden. Manuelle Eingabe über 'make bin=/path/to/bin' [target]."
+	@test -n ${bin} || echo "Kann bin-Verzeichnis(z.B. /usr/bin) nicht finden. Manuelle Eingabe Ã¼ber 'make bin=/path/to/bin' [target]."
 	@test -n ${bin}
-	@test -w ${bin} || echo "Kann Verknüpfung ${bin}/jp_parser nicht erzeugen. Keine Schreibrechte."
+	@test -w ${bin} || echo "Kann VerknÃ¼pfung ${bin}/jp_parser nicht erzeugen. Keine Schreibrechte."
 	@test -w ${bin}
 	@test -L ${bin}/jp_parser || echo "ln -s ${currentdir}/jp_parser ${bin}/jp_parser"
 	@test -L ${bin}/jp_parser || ln -s ${currentdir}/jp_parser ${bin}/jp_parser
@@ -76,7 +76,7 @@ install: doc mandirs exec
 	cp ./doc/jp_*.3 ${mandir3}
 
 exec:
-@test -x ./jp_parser || chmod a+x ./jp_parser
+	@test -x ./jp_parser || chmod a+x ./jp_parser
 
 tar:
 	${tar}cf ${archiv} ${archivfiles}

@@ -98,7 +98,7 @@ sub getwidth {
         
         $length = $length > $sublength ? $length : $sublength;
         
-        $width += 8 * $length;
+        $width += 8 * $length + 20;
         return $width;
 }
 
